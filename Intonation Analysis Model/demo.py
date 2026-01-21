@@ -127,7 +127,7 @@ def run_intonation_analysis(audio_path):
 # ==========================================
 if __name__ == "__main__":
     # 테스트 파일 경로
-    test_file = "./module_tests/wav_data/i_am_a_student_test.wav"
+    test_file = "./wav_data/i_am_a_student_test.wav"
     
     result_data = run_intonation_analysis(test_file)
     
