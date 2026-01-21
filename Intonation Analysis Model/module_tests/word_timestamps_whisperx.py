@@ -6,7 +6,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"현재 사용 디바이스: {device}")
 
 # 오디오 파일 경로
-audio_file = "./wav_data/i_am_a_student_test.wav" 
+audio_file = "../wav_data/i_am_a_student_test.wav" 
 
 # 2. Whisper 모델 로드 (영어 전용 small.en 사용)
 # compute_type은 GPU 메모리가 넉넉하면 "float16", 부족하면 "int8"

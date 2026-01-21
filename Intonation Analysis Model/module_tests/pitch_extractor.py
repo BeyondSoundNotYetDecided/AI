@@ -95,7 +95,7 @@ def extract_pitch_for_words(audio_path, word_segments):
 # ==========================================
 if __name__ == "__main__":
     # 1. 테스트할 오디오 파일 경로
-    test_audio = "./wav_data/i_am_a_student_test.wav"
+    test_audio = "../wav_data/i_am_a_student_test.wav"
     
     # 2. WhisperX에서 얻은 결과값 (테스트용 더미 데이터)
     whisper_output_mock = [
