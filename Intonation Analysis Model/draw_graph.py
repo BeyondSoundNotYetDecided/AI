@@ -72,7 +72,7 @@ def draw_trend_pitch_graph(result_data):
         # 점 찍기
         if n_points > 0:
             # 계산된 위치(mid_time, mid_pitch)에 점 찍기
-            plt.scatter(mid_time, mid_pitch, s=100, color='#36A2EB', zorder=10, edgecolor='white', linewidth=2)
+            # plt.scatter(mid_time, mid_pitch, s=100, color='#36A2EB', zorder=10, edgecolor='white', linewidth=2)
             
             # 텍스트 표시
             plt.text(mid_time, mid_pitch + 25, word, 
@@ -92,7 +92,7 @@ def draw_trend_pitch_graph(result_data):
 if __name__ == "__main__":
     from demo import run_intonation_analysis
     
-    test_file = "./wav_data/i_like_to_dance.wav" 
+    test_file = "./wav_data/i_am_a_student.wav" 
     
     data = run_intonation_analysis(test_file)
     draw_trend_pitch_graph(data)
