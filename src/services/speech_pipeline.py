@@ -13,21 +13,30 @@ from src.models.align_merge import merge_words_with_pitch_curve
 from src.models.g2p import text_to_phonemes
 from src.models.pronunciation import phonemes_to_hangul_ipa
 
-Mode = Literal["pronunciation", "intonation", "all"]
+Mode = Literal["pron", "inton", "all"]
 
 
 def _process_pronunciation(words: List[str]) -> Dict[str, Any]:
     """발음 분석 실행"""
-    text = " ".join(words).strip()
-    phonemes = text_to_phonemes(text)
-    hangul, ipa_str, ipa_list = phonemes_to_hangul_ipa(phonemes)
-    
-    return {
-        "hangul": hangul,
-        "ipa": ipa_str,
-        "ipa_list": ipa_list,
-        # "phonemes": phonemes, # 필요 시 주석 해제
-    }
+    pron: Dict[str, Any] = {}
+
+    for idx, w in enumerate(words):
+        # 1) 단어별 phonemes (ARPAbet) -> upl
+        upl = text_to_phonemes(w)
+
+        # 2) 단어별 한글/IPA
+        ukor, _ipa_str, uipa = phonemes_to_hangul_ipa(upl)
+
+        # 동일 단어 반복 대비: key를 유니크하게
+        key = w  # 중복 가능성 있으면: f"{w}#{idx}"로 변경
+
+        pron[key] = {
+            "upl": upl,     # ARPAbet list
+            "uipa": uipa,   # IPA list
+            "ukor": ukor,   # 한글 발음 문자열
+        }
+
+    return pron
 
 
 def _process_intonation(
@@ -76,14 +85,14 @@ def analyze_speech(
     
     # 기본 결과 구조 생성
     result = {
-        "mode": mode,
+        # "mode": mode,
         "words": words,
-        "word_segments": word_segments,
+        # "word_segments": word_segments,
     }
 
     # 실행할 작업 플래그 설정
-    do_pron = mode in ("pronunciation", "all")
-    do_into = mode in ("intonation", "all")
+    do_pron = mode in ("pron", "all")
+    do_into = mode in ("inton", "all")
 
     # 2. 분석 실행
     if parallel and do_pron and do_into:
@@ -92,15 +101,15 @@ def analyze_speech(
             future_pron = executor.submit(_process_pronunciation, words)
             future_into = executor.submit(_process_intonation, audio_path, word_segments, device)
             
-            result["pronunciation"] = future_pron.result()
-            result["intonation"] = future_into.result()
+            result["pron"] = future_pron.result()
+            result["inton"] = future_into.result()
     else:
         # 순차 처리
         if do_pron:
-            result["pronunciation"] = _process_pronunciation(words)
+            result["pron"] = _process_pronunciation(words)
         
         if do_into:
-            result["intonation"] = _process_intonation(audio_path, word_segments, device)
+            result["inton"] = _process_intonation(audio_path, word_segments, device)
 
     return result
 
@@ -111,7 +120,7 @@ if __name__ == "__main__":
     import os
 
     # 테스트 파일 경로 확인
-    test_file = "./wav_data/i_like_to_dance.wav"
+    test_file = "./experiments/wav_data/i_like_to_dance.wav"
     
     if os.path.exists(test_file):
         out = analyze_speech(test_file, mode="all", parallel=False)
