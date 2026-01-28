@@ -1,9 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import StreamingResponse
-import shutil
-import os
 
-from src.services.audio_io import bytes_to_audio_file, safe_remove
+from src.services.audio_io import temp_audio_file
 from src.services.speech_pipeline import analyze_speech_stream
 from src.models.stt_whisper import get_whisperx_models
 
@@ -35,25 +33,20 @@ async def analyze(file: UploadFile = File(...)):
     
     # 1. 파일 읽기 (Bytes)
     audio_bytes = await file.read()
-    
-    # 2. 임시 파일 생성
-    audio_path = bytes_to_audio_file(audio_bytes, suffix=".wav") 
-    
-    # 3. 제너레이터 래퍼
+        
+    # 2. 제너레이터 래퍼
     def stream_with_cleanup():
-        try:
-            # 분석 스트림 실행 (yield를 통해 하나씩 전달)
+        with temp_audio_file(audio_bytes, suffix=".wav") as audio_path:
+            
+            # 파일 경로(audio_path)를 파이프라인에 넘김
             for chunk in analyze_speech_stream(
                 audio_path=audio_path,
                 loaded_models=loaded_models,
                 mode="all"
             ):
                 yield chunk
-        finally:
-            print(f"🗑️ 임시 파일 삭제: {audio_path}")
-            safe_remove(audio_path)
 
-    # 4. StreamingResponse 반환
+    # 3. StreamingResponse 반환
     return StreamingResponse(
         stream_with_cleanup(), 
         media_type="application/x-ndjson"

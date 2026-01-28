@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import tempfile
+import contextlib
+from typing import Generator
 
 def bytes_to_audio_file(
     audio_bytes: bytes,
@@ -38,3 +40,15 @@ def safe_remove(path: str) -> None:
             os.remove(path)
     except Exception:
         pass
+
+@contextlib.contextmanager
+def temp_audio_file(file_bytes: bytes, suffix: str = ".wav") -> Generator[str, None, None]:
+    """
+    [기능] with 문과 함께 사용하여 임시 파일을 생성하고,
+          사용이 끝나면(블록 탈출 시) 자동으로 삭제합니다.
+    """
+    path = bytes_to_audio_file(file_bytes, suffix) # 파일 생성
+    try:
+        yield path # 파일 경로를 빌려줌
+    finally:
+        safe_remove(path) # 사용 후 삭제

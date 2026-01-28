@@ -7,7 +7,7 @@ from src.models.stt_whisper import (
     get_whisperx_models,
     extract_word_timings,
 )
-
+from src.models.stt_whisper import WhisperModels
 from src.models.pitch_crepe import extract_pitch_crepe
 from src.models.align_merge import merge_words_with_pitch_curve
 from src.models.g2p import text_to_phonemes
@@ -53,7 +53,7 @@ def analyze_speech_stream(
     audio_path: str,
     # whisper_model_name: str = "small.en",
     # whisper_vad_method: str = "silero",
-    loaded_models: tuple,   # 이미 로딩된 모델을 받음
+    loaded_models: WhisperModels,   # 이미 로딩된 모델을 받음
     mode: Mode = "all",
 ) -> Generator[str, None, None]:
     """
@@ -68,7 +68,10 @@ def analyze_speech_stream(
     #     model_name=whisper_model_name,
     #     vad_method=whisper_vad_method,
     # )
-    model, model_a, metadata, device = loaded_models
+    model = loaded_models.model
+    model_a = loaded_models.align_model
+    metadata = loaded_models.metadata
+    device = loaded_models.device
     
     try:
         word_segments = extract_word_timings(

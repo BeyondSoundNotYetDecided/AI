@@ -68,7 +68,12 @@ def get_whisperx_models(model_name: str = "small.en", vad_method: str = "silero"
     _MODEL_CACHE["metadata"] = metadata
     _MODEL_CACHE["device"] = device
 
-    return model, model_a, metadata, device
+    return WhisperModels(
+        model=model,
+        align_model=model_a,
+        metadata=metadata,
+        device=device
+    )
 
 # WhisperX 단어 타이밍 추출 함수
 def extract_word_timings(audio_path: str, model, model_a, metadata, device: str, batch_size: int = 16):
