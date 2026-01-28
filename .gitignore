@@ -35,7 +35,6 @@ logs/
 *.pt
 *.pth
 *.h5
-models/
 checkpoints/
 
 # Misc
