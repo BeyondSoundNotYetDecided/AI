@@ -84,12 +84,6 @@ def analyze_speech_stream(
         return
 
     words = [w["word"] for w in word_segments]
-    
-    # 기본 결과 구조 생성
-    yield json.dumps({
-        "type": "words",
-        "data": words
-    }, ensure_ascii=False) + "\n"
 
     # 실행할 작업 플래그 설정
     do_pron = mode in ("pron", "all")
