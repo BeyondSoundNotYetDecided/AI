@@ -4,10 +4,10 @@ from typing import Any, Dict, List, Literal
 from concurrent.futures import ThreadPoolExecutor
 
 from src.models.stt_whisper import (
-    load_whisperx_models,
+    get_whisperx_models,
     extract_word_timings,
-    cleanup_whisperx_models,
 )
+
 from src.models.pitch_crepe import extract_pitch_crepe
 from src.models.align_merge import merge_words_with_pitch_curve
 from src.models.g2p import text_to_phonemes
@@ -64,22 +64,19 @@ def analyze_speech(
     """
     
     # 1. WhisperX 공통 단계: 모델 로드 -> 실행 -> 메모리 정리
-    model, model_a, metadata, device = load_whisperx_models(
+    model, model_a, metadata, device = get_whisperx_models(
         model_name=whisper_model_name,
         vad_method=whisper_vad_method,
     )
     
-    try:
-        word_segments = extract_word_timings(
-            audio_path=audio_path,
-            model=model,
-            model_a=model_a,
-            metadata=metadata,
-            device=device,
-            batch_size=16,
-        )
-    finally:
-        cleanup_whisperx_models(model, model_a)
+    word_segments = extract_word_timings(
+        audio_path=audio_path,
+        model=model,
+        model_a=model_a,
+        metadata=metadata,
+        device=device,
+        batch_size=16,
+    )
 
     words = [w["word"] for w in word_segments]
     
