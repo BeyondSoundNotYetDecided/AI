@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal
-from concurrent.futures import ThreadPoolExecutor
-
+from typing import Any, Dict, List, Literal, Generator
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 from src.models.stt_whisper import (
     get_whisperx_models,
     extract_word_timings,
 )
-
+from src.models.stt_whisper import WhisperModels
 from src.models.pitch_crepe import extract_pitch_crepe
 from src.models.align_merge import merge_words_with_pitch_curve
 from src.models.g2p import text_to_phonemes
@@ -49,13 +49,13 @@ def _process_intonation(
     return merge_words_with_pitch_curve(word_segments, pitch_result)
 
 
-def analyze_speech(
+def analyze_speech_stream(
     audio_path: str,
+    # whisper_model_name: str = "small.en",
+    # whisper_vad_method: str = "silero",
+    loaded_models: WhisperModels,   # 이미 로딩된 모델을 받음
     mode: Mode = "all",
-    parallel: bool = True,
-    whisper_model_name: str = "small.en",
-    whisper_vad_method: str = "silero",
-) -> Dict[str, Any]:
+) -> Generator[str, None, None]:
     """
     [기능] 음성 파이프라인 메인 함수
     1. WhisperX (공통)
@@ -64,63 +64,100 @@ def analyze_speech(
     """
     
     # 1. WhisperX 공통 단계: 모델 로드 -> 실행 -> 메모리 정리
-    model, model_a, metadata, device = get_whisperx_models(
-        model_name=whisper_model_name,
-        vad_method=whisper_vad_method,
-    )
+    # model, model_a, metadata, device = get_whisperx_models(
+    #     model_name=whisper_model_name,
+    #     vad_method=whisper_vad_method,
+    # )
+    model = loaded_models.model
+    model_a = loaded_models.align_model
+    metadata = loaded_models.metadata
+    device = loaded_models.device
     
-    word_segments = extract_word_timings(
-        audio_path=audio_path,
-        model=model,
-        model_a=model_a,
-        metadata=metadata,
-        device=device,
-        batch_size=16,
-    )
+    try:
+        word_segments = extract_word_timings(
+            audio_path=audio_path,
+            model=model,
+            model_a=model_a,
+            metadata=metadata,
+            device=device,
+            batch_size=16,
+        )
+    except Exception as e:
+        yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+        return
 
     words = [w["word"] for w in word_segments]
-    
-    # 기본 결과 구조 생성
-    result = {
-        # "mode": mode,
-        "words": words,
-        # "word_segments": word_segments,
-    }
 
     # 실행할 작업 플래그 설정
     do_pron = mode in ("pron", "all")
     do_into = mode in ("inton", "all")
 
     # 2. 분석 실행
-    if parallel and do_pron and do_into:
-        # 병렬 모드 (G2P는 CPU, CREPE는 GPU를 주로 쓰므로 효율적일 수 있음)
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future_pron = executor.submit(_process_pronunciation, words)
-            future_into = executor.submit(_process_intonation, audio_path, word_segments, device)
-            
-            result["pron"] = future_pron.result()
-            result["inton"] = future_into.result()
-    else:
-        # 순차 처리
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_map = {}
+
         if do_pron:
-            result["pron"] = _process_pronunciation(words)
+            # 발음 분석 작업 제출
+            f_pron = executor.submit(_process_pronunciation, words)
+            future_map[f_pron] = "pron"
         
         if do_into:
-            result["inton"] = _process_intonation(audio_path, word_segments, device)
+            # 인토네이션 분석 작업 제출
+            f_into = executor.submit(_process_intonation, audio_path, word_segments, device)
+            future_map[f_into] = "inton"
 
-    return result
-
+        # 먼저 끝나는 작업부터 yield (as_completed)
+        for future in as_completed(future_map):
+            task_type = future_map[future]
+            try:
+                result_data = future.result()
+                
+                # 결과 전송 (type으로 구분)
+                yield json.dumps({
+                    "type": task_type,
+                    "data": result_data
+                }, ensure_ascii=False) + "\n"
+                
+            except Exception as e:
+                yield json.dumps({
+                    "type": "error",
+                    "task": task_type,
+                    "message": str(e)
+                }, ensure_ascii=False) + "\n"
 
 # 로컬 실행 테스트용
 if __name__ == "__main__":
     import json
     import os
+    # 모델 로더 함수 import 필요
+    from src.models.stt_whisper import get_whisperx_models
 
     # 테스트 파일 경로 확인
     test_file = "./experiments/wav_data/i_like_to_dance.wav"
     
     if os.path.exists(test_file):
-        out = analyze_speech(test_file, mode="all", parallel=False)
-        print(json.dumps(out, indent=2, ensure_ascii=False))
+        print("⏳ [Test] 모델 로딩 중... (처음엔 시간이 좀 걸립니다)")
+        
+        # 1. 테스트를 위해 여기서 모델을 직접 로드합니다. (Main.py의 lifespan 역할)
+        # 실제 서버에서는 이미 로드된 걸 쓰지만, 로컬 테스트에선 직접 준비해야 합니다.
+        loaded_models_tuple = get_whisperx_models(
+            model_name="small.en", 
+            vad_method="silero"
+        )
+        print("✅ [Test] 모델 로딩 완료!")
+
+        print("🎤 [Test] 분석 시작...")
+        
+        # 2. 로드된 모델을 인자로 넘겨줍니다.
+        generator = analyze_speech_stream(
+            audio_path=test_file, 
+            mode="all", 
+            loaded_models=loaded_models_tuple # <--- 핵심: 모델 전달
+        )
+        
+        # 3. 결과 스트리밍 출력
+        for chunk in generator:
+            print(chunk.strip())
+            
     else:
-        print(f"파일을 찾을 수 없습니다: {test_file}")
+        print(f"❌ 파일을 찾을 수 없습니다: {test_file}")
