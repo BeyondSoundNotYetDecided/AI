@@ -1,5 +1,14 @@
-import torch
 import whisperx
+import torch
+from dataclasses import dataclass
+from typing import Any
+
+@dataclass
+class WhisperModels:
+    model: Any
+    align_model: Any
+    metadata: Any
+    device: str
 
 # 캐시된 모델 정보
 _MODEL_CACHE = {

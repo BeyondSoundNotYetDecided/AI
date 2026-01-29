@@ -26,6 +26,7 @@ async def shutdown_event():
     loaded_models = None
     print("🛑 서버 종료")
 
+
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
     if not file.filename:
